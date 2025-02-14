@@ -7,6 +7,8 @@ export class Blockchain {
   chain: Block[];
   validators: Wallet[];
   pendingTransactions: Transaction[];
+  REWARD_AMOUNT = 5; // Tokens otorgados al validador por cada bloque validado
+  SLASHING_AMOUNT = 10; // Penalización si un validador intenta validar una transacción inválida
 
   constructor() {
     this.chain = [this.createGenesisBlock()];
@@ -45,8 +47,21 @@ export class Blockchain {
       )
     ) {
       console.log("⚠️ Transacción inválida: Firma no válida.");
+
+      // **🚨 Penalizar al validador (slashing)**
+      const validator = this.validators.find(
+        (w) => w.address === transaction.sender
+      );
+      if (validator) {
+        validator.stake = Math.max(0, validator.stake - this.SLASHING_AMOUNT); // Evita saldo negativo
+        console.log(
+          `❌ ${validator.address.substring(0, 10)}... fue penalizado con ${this.SLASHING_AMOUNT} tokens.`
+        );
+      }
+
       return false;
     }
+
     this.pendingTransactions.push(transaction);
     console.log("✅ Transacción añadida al pool.");
     return true;
@@ -119,6 +134,7 @@ export class Blockchain {
       return;
     }
 
+    // Crear el bloque con las transacciones actuales
     const previousBlock = this.chain[this.chain.length - 1]!;
     const newBlock = new Block(
       this.chain.length,
@@ -127,7 +143,7 @@ export class Blockchain {
       validator.address
     );
 
-    // Actualizar balances
+    // Actualizar los balances de los usuarios según las transacciones
     this.pendingTransactions.forEach((tx) => {
       const senderWallet = this.validators.find((w) => w.address === tx.sender);
       const recipientWallet = this.validators.find(
@@ -139,8 +155,17 @@ export class Blockchain {
       }
     });
 
+    // **🏅 Asignar recompensa al validador**
+    validator.balance += this.REWARD_AMOUNT;
+    console.log(
+      `💰 ${validator.address.substring(0, 10)}... recibió ${this.REWARD_AMOUNT} tokens por validar el bloque.`
+    );
+
+    // Agregar el bloque a la blockchain
     this.chain.push(newBlock);
     this.pendingTransactions = []; // Limpiar transacciones procesadas
-    console.log(`🏅 ${validator.address} validó el bloque #${newBlock.index}`);
+    console.log(
+      `🏅 ${validator.address.substring(0, 10)}... validó el bloque #${newBlock.index}`
+    );
   }
 }
